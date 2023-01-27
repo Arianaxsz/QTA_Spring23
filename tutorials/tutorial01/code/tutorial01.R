@@ -1,11 +1,15 @@
 ############################
 # Tutorial 1: Web Scraping #
 ############################
+#git clone [url from github]
+install.packages("xml2")
+install.packages("rvest")
 
 ## Packages
 library(tidyverse) # load our packages here
 library(rvest)
-library(xml2)
+library(xml2) #help us navigate xml/html folders 
+library(ggplot2)
 
 ##################
 # Importing html #
@@ -14,12 +18,13 @@ library(xml2)
 # We use the read_html() function from rvest to read in the html
 bowlers <- "https://stats.espncricinfo.com/ci/content/records/93276.html"
 
-html <- read_html()
+html <- read_html(bowlers)
 html
+        ### html has 3 line structures to it with it's subdomains 
 
 # We can inspect the structure of this html using xml_structure() from xml2
-xml_structure(html)
-capture.output(xml_structure(html))
+xml_structure(html) 
+capture.output(xml_structure(html))   #Note: this one vectoring the html so we can get the individual elemtns of it, but still not very useful
 
 # That's quite a big html! maybe we should go back to square 1 and inspect the 
 # page...
@@ -42,12 +47,14 @@ capture.output(xml_structure(html))
 # come across css as well. This website - https://exadel.com/news/how-to-choose-selectors-for-automation-to-make-your-life-a-whole-lot-easier
 # gives a good overview of the difference between the two.
 
+?xpath
+
 # html nodes using html_nodes()
-html %>%
-  html_nodes() # try searching for the table node
+html %>% 
+  html_nodes("table") # try searching for the table node - we'd use as a character string, it gives us all the table in the document 
 
 html %>%
-  html_nodes() # we could also try using the class - add a dot before
+  html_nodes(".engineTable") # we could also try using the class - add a dot before - Note: class could help filtering the search
 
 # xpaths
 # To search using xpath selectors, we need to add the xpath argument.
@@ -58,7 +65,7 @@ html %>%
 
 # Try selecting the first node of the table class, and assign it to a new object
 tab1 <- html %>%
-  html_nodes()
+  html_nodes(xpath = "//table[position() = 1]")
 
 # Let's look at the structure of this node. We could use the xml_structure() 
 # function, but the html is still too big. Try inspecting the object in the 
@@ -66,7 +73,7 @@ tab1 <- html %>%
 
 # We basically want "thead" and "tbody". How might we get those?
 tab2 <- tab1 %>%
-  html_nodes()
+  html_nodes(xpath = "//table/thead | //table/tbody")
 
 # We now have an object containing 2 lists. With a bit of work we can extract 
 # the text we want as a vector:
@@ -82,13 +89,18 @@ body <- tab2[2] %>%
 # could use our R wrangling skills to shape these into a rectangular data.frame. 
 # There is an easier way though - the html_table() function. Let's trace back a 
 # few steps to our tab1 object...
-xml_children(tab1)
+xml_children(tab1) 
 
 # We can see that tab1 has three children. Our categories are stored in the 
 # "thead" node, and our data are in the "tbody" node. The html_table() function 
 # can parse this type of structure automatically. Try it out, and assign the 
 # result to an object.
-dat <- 
+
+dat <- html_table(tab1) # this is inside a list, and we want a data.frame 
+dat <- html_table(tab1)[[1]]  # when indexing it returns us the data.frame 
+class(dat) #tible 
+head(dat)
+
 
 dat %>%
   filter(grepl("ENG|AUS", Player)) %>%
@@ -103,3 +115,34 @@ dat %>%
 # Now that we've managed to do that for bowlers, try completing all the steps 
 # yourselves on a new html - top international batsmen!
 batsmen <- "https://stats.espncricinfo.com/ci/content/records/223646.html"
+
+html <- read_html(batsmen)
+html
+
+tab1 <- html %>%
+  html_nodes(xpath = "//table[position() = 1]")
+
+tab2 <- tab1 %>%
+  html_nodes(xpath = "//table/thead | //table/tbody")
+
+
+heads <- tab2[1] %>%
+  html_nodes(xpath = "//th") %>%
+  html_text()
+
+body <- tab2[2] %>%
+  html_nodes(xpath = "//tr/td") %>%
+  html_text()
+
+
+
+dat <- html_table(tab1) # this is inside a list, and we want a data.frame 
+dat <- html_table(tab1)[[1]]  # when indexing it returns us the data.frame 
+class(dat) #tible 
+head(dat)
+
+dat %>%
+  filter(grepl("ENG|AUS", Player)) %>%
+  ggplot(aes(Mat, Runs)) +
+  geom_text(aes(label = Player)) +
+  geom_smooth(method = "lm")
