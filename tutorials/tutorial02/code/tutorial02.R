@@ -24,7 +24,8 @@ lapply(c("tidyverse",
 gu_api_key() # run this interactive function
 
 # We want to query the API on articles featuring Ukraine since Jan 1 2023
-dat <- gu_content(query = "", from_date = "") # making a tibble
+dat <- gu_content(query = " Ukraine ", from_date = "2023-01-01") # making a tibble
+?gu_content
 
 # We'll save this data
 saveRDS(dat, "data/df2023")
@@ -35,16 +36,18 @@ df <- dat
 # Try to find the column we need for our text analyses
 head(df) # checking our tibble
 
-df <- df[] # see if you can subset the object to focus on the articles we want
+df <- df[,34] # see if you can subset the object to focus on the articles we want (we didn't use this one in the end)
+
+df <- df[df$type == "article" & df$section_id == "world",] #we use this one so we got to index
 
 which(duplicated(df$web_title) == TRUE) # sometimes there are duplicates...
-df <- df[!duplicated(df$web_title),] # which we can remove
+df <- df[!duplicated(df$web_title),] # which we can remove, we are using the "!" symbol and the coma "," 
 
 ### B. Making a corpus
 # We can use the corpus() function to convert our df to a quanteda corpus
 corpus_ukr <- corpus(df, 
-                     docid_field = "", 
-                     text_field = "") # select the correct column here
+                     docid_field = "web_title", 
+                     text_field = "body_text") # select the correct column here
 
 # Checking our corpus
 summary(corpus_ukr, 5)
@@ -62,7 +65,9 @@ test <- as.character(corpus_ukr)[1] # make a test object
 
 stri_replace_first(test, 
                    replacement = "", # nothing here (i.e. we're removing)
-                   regex = "") #try to write the correct regex - this may help: https://www.rexegg.com/regex-quickstart.html
+                   regex = " ^.+?\"") #try to write the correct regex - this may help: https://www.rexegg.com/regex-quickstart.html
+
+#I tried using the big W as well 
 
 # Sometimes there's also boilerplate at the end of an article after a big centre dot. 
 as.character(corpus_ukr)[which(grepl("\u2022.+$", corpus_ukr))[1]]
@@ -124,21 +129,25 @@ lemma_toks <- lapply(toks_list, lemmatize_words)
 # iii. Convert the list of lemmatized tokens back to a quanteda tokens object
 lemma_toks <- as.tokens(lemma_toks) 
 
+
 # Compare article 10 in toks, stem_toks and lemma_toks: what do you notice?
-# Which is smallest?
+# Which is smallest? they do different things and have different results 
+toks[12]
+lemma_toks[12]
+stem_toks[12]
 
 ## 6. Detect collocations
 # Collocations are groups of words (grams) that are meaningful in combination. 
 # To identify collocations we use the quanteda textstats package 
 
-# i. Identify collocations
+# i. Identify collocations # words that only has meaning together, e.g. "Give up"
 collocations <- textstat_collocations(lemma_toks, size = 2)
 
 # ii. Choose which to keep
 keep_coll_list <- collocations$collocation[1:20]
 keep_coll_list
 
-# iii. Apply to tokens object
+# iii. Apply to tokens object - compounds tokens 
 comp_tok <- tokens_compound(lemma_toks, keep_coll_list)
 
 ### D. Creating the document-feature matrix (dfm)
@@ -154,6 +163,7 @@ saveRDS(dfm_ukr, "data/dfm")
 # We'll leave operations on the dfm until next time, but to give a preview, here are 
 # some functions we can use to analyse the dfm.
 topfeatures(dfm_ukr)
+head(dfm_ukr) #features = every documents and how many times in that doc each word appears 
 
 # We can also visualise the dfm using the textplots package from quanteda
 dfm_ukr %>%
@@ -166,4 +176,87 @@ dfm_ukr %>%
 # See if you can repeat pre-processing on this data, and compare the features
 # and wordcloud that results.
 
+# -- Step 1 -- # 
 df2022 <- readRDS("data/df2022")
+df2022
+# -- Step 2 -- # Making a corpus 
+
+which(duplicated(df2022$web_title) == TRUE) # sometimes there are duplicates...
+df2 <- df2022[!duplicated(df2022$web_title),] # which we can remove, we are using the "!" symbol and the coma "," 
+
+corpus_ukr22 <- corpus(df2, 
+                     docid_field = "web_title", 
+                     text_field = "body_text") # select the correct column here
+
+# Checking our corpus
+summary(corpus_ukr22, 5)
+# -- Step 3 -- # Cleaning 
+
+test <- as.character(corpus_ukr22)[1] # make a test object
+
+stri_replace_first(test, 
+                   replacement = "", # nothing here (i.e. we're removing)
+                   regex = " ^.+?\"") #try to write the correct regex - this may help: https://www.rexegg.com/regex-quickstart.html
+
+# -- Step 4 -- # Tokenization / lowercase / remove 
+toks2 <- quanteda::tokens(corpus_ukr22, 
+                         remove_punct = TRUE, 
+                         remove_symbols = TRUE)
+
+## 3. Lowercase the text 
+toks2 <- tokens_tolower(toks2) # lowercase tokens
+print(toks2[10]) # print lowercase tokens from the 10th article in corpus.
+# The tokens_remove() function allows us to apply the stop_list to our toks object
+toks2 <- tokens_remove(toks2, stop_list)
+
+
+# -- Step 5 -- #Stem/Len/Token
+
+stem_toks <- tokens_wordstem(toks2)
+
+# i. Convert quanteda tokens object to list of tokens
+toks_list2 <- as.list(toks2) 
+
+# ii. Apply the lemmatize_words function from textstem to the list of tokens
+lemma_toks2 <- lapply(toks_list, lemmatize_words) 
+
+# iii. Convert the list of lemmatized tokens back to a quanteda tokens object
+lemma_toks2 <- as.tokens(lemma_toks2) 
+
+## Compare 
+toks2[10]
+stem_toks[10]
+lemma_toks2[10]
+
+## collocation 
+# i. Identify collocations # words that only has meaning together, e.g. "Give up"
+collocations2 <- textstat_collocations(lemma_toks, size = 2)
+
+# ii. Choose which to keep
+keep_coll_list2 <- collocations$collocation[1:20]
+keep_coll_list2
+
+# iii. Apply to tokens object - compounds tokens 
+comp_tok2 <- tokens_compound(lemma_toks, keep_coll_list2)
+
+
+# -- Step 6 -- # dfm 
+
+# Convert to dfm...
+dfm_ukr22 <- dfm(comp_tok2)
+
+# ...and save
+saveRDS(dfm_ukr22, "data/dfm")
+
+# We'll leave operations on the dfm until next time, but to give a preview, here are 
+# some functions we can use to analyse the dfm.
+topfeatures(dfm_ukr22)
+head(dfm_ukr22) #features = every documents and how many times in that doc each word appears 
+
+# We can also visualise the dfm using the textplots package from quanteda
+dfm_ukr22 %>%
+  dfm_trim(min_termfreq = 3) %>%
+  textplot_wordcloud(min_size = 1, max_size = 10, max_words = 100)
+
+
+
