@@ -72,7 +72,7 @@ which(duplicated(tidy22$headline))
 which(duplicated(tidy23$headline))
 
 # We can use the same code to drop duplicated headlines:
-tidy22 <- tidy22[-which(duplicated(tidy22$headline)),]
+tidy22 <- tidy22[-which(duplicated(tidy22$headline)),] #which gives us the index and we are subsetting to remove the duplicates 
 tidy23 <- tidy23[-which(duplicated(tidy23$headline)),]
 
 # Let's also tidy the body_text column before we transform into a corpus
@@ -107,7 +107,7 @@ corpSum23 %>%
   ggplot(aes(date)) +
   geom_histogram() # note, we can use geom_density() to give the pdf
 
-# We can also plot these simultaneously using lubridate
+# We can also plot these simultaneously using lubridate (data wranggling with ggplot)
 ggplot(data = NULL) +
   geom_density(aes(yday(corpSum22$date)), color = "red") +
   geom_density(aes(yday(corpSum23$date)), color = "blue") 
@@ -125,6 +125,7 @@ ggplot(data = NULL) +
   geom_smooth(aes(yday(corpSum23$date), corpSum23$ttr), col = "blue")
   
 # How would you interpret this plot?
+# Red is 2022 and blue 2023, it seems that 2022 there was more news about Ukraine at the end of the month and this year it has been steady. 
 
 ## Exercise: Readability
 # "Readability" is a qualitative metric. A common scale is Flesch-Kincaid, 
@@ -132,14 +133,28 @@ ggplot(data = NULL) +
 # the function textstat_readability() to calculate the F-K scale and assign
 # it as a new column to the corpus_sum object.
 ?textstat_readability
+### we are using regular expressions 
+
+
+txt <- c(doc1 = "corpSum22")
+textstat_readability(txt, measure = "Flesch")
+class(corpSum22) #data.frame 
+corpSum22 <- cbind(corpSum22, txt) # this was my trial 
+
+corpSum22$fk <- textstat_readability(corp22, measure = "Flesch")
+corpSum23$fk <- textstat_readability(corp23, measure = "Flesch")
+
 
 # Once you've done that, try plotting the F-K scale according to byline.
 # Let's compare three correspondents: Luke Harding, Jennifer Rankin and
 # Julian Borger. Look at the code below and fill in the necessary arguments.
+#Regular Expression 
+grepl("Luke Harding|Jennifer Rankin| Julian Borger", 
+      corpSum22, ignore.case = TRUE)
 
 corpSum22 %>%
-  filter(grepl(pattern, col)) %>%
-  group_by(grp = str_extract(col, pattern)) %>%
+  filter(grepl("Luke Harding|Jennifer Rankin| Julian Borger", byline, ignore.case = TRUE)) %>%
+  group_by(grp = str_extract(byline, "Luke Harding|Jennifer Rankin| Julian Borger")) %>%
   summarise(av = mean(fk$Flesch.Kincaid)) %>%
   ggplot(aes(x = reorder(grp, -av), y = av)) +
   geom_col() +
@@ -179,8 +194,10 @@ colc23 <- textstat_collocations(toks23, size = 2, min_count = 10)
 # This time, let's look at the z scores to see what cut-off to use
 ?textstat_collocations
 
-toks22 <- tokens_compound(toks22, pattern = colc22["pick a z score"])
-toks23 <- tokens_compound(toks23, pattern = colc23["pick a z score"])
+toks22 <- tokens_compound(toks22, pattern = colc22$collocation[colc22$z >17])
+toks23 <- tokens_compound(toks23, pattern = colc23$collocation[colc23$z >16])
+summary(colc22$z)
+toks22
 
 # Remove whitespace
 toks22 <- tokens_remove(quanteda::tokens(toks22), "") 
@@ -195,11 +212,28 @@ toks23 <- tokens_wordstem(toks23)
 # for features that should have been removed. Let's do that again
 # this time: create a dfm for both tokens objects, then go back to
 # remove the necessary stopwords.
+?topfeatures
+topfeatures(dfm22)
+topfeatures(dfm23)
 
+toks22 <- tokens_remove(toks22, c("said",
+                                  "say",
+                                  "ukrain",
+                                  "ukrainian",
+                                  "russia",
+                                  "russian"))
 
+toks23 <- tokens_remove(toks23, c("said",
+                                  "say",
+                                  "ukrain",
+                                  "ukrainian",
+                                  "russia",
+                                  "russian"))
 #### 4. Statistics with the dfm 
+dfm22 <- dfm(toks22) # if we use "" we don't get the correct words. -…- 
+dfm23 <- dfm(toks23)
 # Let's compare the relative frequency of features from our two years.
-dfm22_frq <- textstat_frequency(dfm22, n = 20)
+dfm22_frq <- textstat_frequency(dfm22, n = 20) #this is the amount of words we want to check 
 dfm23_frq <- textstat_frequency(dfm23, n = 20)
 
 dfm22_frq %>%
@@ -214,14 +248,14 @@ dfm23_frq %>%
   coord_flip() +
   labs(x = "feature")
   
-# We can also bind together our two dfms
+# We can also bind together our two dfms; 
 dfm_ukr <- rbind(dfm22, dfm23)
 
 # This allows us to analyse and compare keyness across years
 set.seed(2023)
-dfm_by_date <- dfm_group(dfm_ukr, fill = TRUE, groups = year(dfm_ukr$date))
+dfm_by_date <- dfm_group(dfm_ukr, fill = TRUE, groups = year(dfm_ukr$date)) #we are grouping the data with ludridate 
 keyness <- textstat_keyness(dfm_by_date, target = "2022")
-textplot_keyness(keyness, labelsize = 3)
+textplot_keyness(keyness, labelsize = 2)
 
 # Finally, let's see if sentiment analysis can detect a change in tone 
 # over time. To do this, we need to use a dictionary object. We only
@@ -247,6 +281,7 @@ docvars(dfm_sentiment) %>%
 # Having performed these analyses, is there anything you would change in 
 # the initial corpus? Try changing a few things and see how it affects 
 # the results.
+
 
 # save our data for next time
 saveRDS(dfm22, "data/dfm22")
