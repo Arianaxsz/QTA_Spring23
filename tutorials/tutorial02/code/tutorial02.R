@@ -65,9 +65,7 @@ test <- as.character(corpus_ukr)[1] # make a test object
 
 stri_replace_first(test, 
                    replacement = "", # nothing here (i.e. we're removing)
-                   regex = " ^.+?\"") #try to write the correct regex - this may help: https://www.rexegg.com/regex-quickstart.html
-
-#I tried using the big W as well 
+                   regex = " ^.+?\"") #try to write the correct regex - this may help: https://www.rexegg.com/regex-quickstart.html #I tried using the big W as well 
 
 # Sometimes there's also boilerplate at the end of an article after a big centre dot. 
 as.character(corpus_ukr)[which(grepl("\u2022.+$", corpus_ukr))[1]]
@@ -110,7 +108,7 @@ toks[10] # print list of tokens from 10th article without stop words.
 # Notice how much shorter the list is now. Can you imagine how much longer it
 # might take to run your model if you don't do this bit properly...
 
-## 5.a. Normalising (or stemming) the tokens
+## 5.a. Normalizing (or stemming) the tokens
 # Now we'll stem the words using the tokens_wordstem() function
 stem_toks <- tokens_wordstem(toks)
 
