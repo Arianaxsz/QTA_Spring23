@@ -96,8 +96,10 @@ corpSum23 <- summary(corp23,
 )
 head(corpSum22[,-8])
 head(corpSum23[,-8])
+class(corpSum22)
 
 ## 2. Corpus statistics
+
 #  We can use the corpus summary object to start creating statistical 
 #  plots of our text data, for instance a histogram of articles over time:
 corpSum22 %>%
@@ -141,20 +143,20 @@ textstat_readability(txt, measure = "Flesch")
 class(corpSum22) #data.frame 
 corpSum22 <- cbind(corpSum22, txt) # this was my trial 
 
-corpSum22$fk <- textstat_readability(corp22, measure = "Flesch")
-corpSum23$fk <- textstat_readability(corp23, measure = "Flesch")
-
+corpSum22$fk <- textstat_readability(corp22, measure = "Flesch.Kincaid")
+corpSum23$fk <- textstat_readability(corp23, measure = "Flesch.Kincaid")
 
 # Once you've done that, try plotting the F-K scale according to byline.
 # Let's compare three correspondents: Luke Harding, Jennifer Rankin and
 # Julian Borger. Look at the code below and fill in the necessary arguments.
 #Regular Expression 
-grepl("Luke Harding|Jennifer Rankin| Julian Borger", 
-      corpSum22, ignore.case = TRUE)
+grepl("Luke Harding|Jennifer Rankin|Julian Borger", 
+      corpSum22$byline, ignore.case = TRUE)
 
 corpSum22 %>%
-  filter(grepl("Luke Harding|Jennifer Rankin| Julian Borger", byline, ignore.case = TRUE)) %>%
-  group_by(grp = str_extract(byline, "Luke Harding|Jennifer Rankin| Julian Borger")) %>%
+  filter(grepl("Luke Harding|Jennifer Rankin|Julian Borger", 
+               byline, ignore.case = TRUE)) %>%
+  group_by(grp = str_extract(byline, "Luke Harding|Jennifer Rankin|Julian Borger")) %>%
   summarise(av = mean(fk$Flesch.Kincaid)) %>%
   ggplot(aes(x = reorder(grp, -av), y = av)) +
   geom_col() +
@@ -164,7 +166,19 @@ corpSum22 %>%
 
 # Try the same for 2023 as well - what do we find?
 
+corpSum23 %>%
+  filter(grepl("Luke Harding|Jennifer Rankin|Julian Borger", 
+               byline, ignore.case = TRUE)) %>%
+  group_by(grp = str_extract(byline, "Luke Harding|Jennifer Rankin|Julian Borger")) %>%
+  summarise(av = mean(fk$Flesch.Kincaid)) %>%
+  ggplot(aes(x = reorder(grp, -av), y = av)) +
+  geom_col() +
+  ggtitle(label = "FK Readability by Correspondent") +
+  xlab(label = NULL) +
+  ylab("Mean Flesch-Kincaid")
+
 ## 3. Creating the tokens list and the dfm
+
 # Let's move on to creating our other data objects: the tokens list and 
 # the dfm. Here are the steps we followed last week:
 toks22 <- quanteda::tokens(corp22, 
