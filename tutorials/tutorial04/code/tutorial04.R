@@ -22,39 +22,75 @@ lapply(c("tidyverse",
        pkgTest)
 
 ## 1. Acquire (?), read in and wrangle data
-dat <- readRDS()
+dat <- readRDS("data/df2023")
+
 
 # You need to a) Subset on section_name, using World news and Opinion, and 
 #                type, using article.
+dat2 <- dat[dat$section_name %in% c("World news", "Opinion") &
+               dat$type == "article",]
 
 #             b) Select relevant columns.
+dat2 <- dat2 %>%
+  select(headline,
+         byline,
+         date = web_publication_date, # Rename date variable
+         section_name,
+         standfirst,
+         body_text
+  ) %>%
+  mutate(date = as_datetime(date)) # parse date - this was not really needed
 
 #             c) Remove duplicates.
+which(duplicated(dat2$headline))
+dat2 <- dat2[-which(duplicated(dat2$headline)),]
 
 # This code relabels our data, because "World news" contains whitespace...
 dat$section_name <- ifelse(dat$section_name == "World news", "World", dat$section_name)
 
 ## 2. QTA Preparation
 # You need to a) Remove the large round symbol.
+dat2$body_text <- str_replace(dat2$body_text, "\u2022.+$", "")
 
 #             b) Convert to a corpus.
+corp23 <- corpus(dat2, 
+                 docid_field = "headline",
+                 text_field = "body_text")
 
 #             c) and d) Clean the corpus and find collocations.
+col23 <- get_coll(corp23)
+
 
 # For steps c) and d), check out the pre_processing.R script.
 source("code/pre_processing.R")
 prepped_toks <- prep_toks(corp) # basic token cleaning
 collocations <- get_coll(prepped_toks) # get collocations
 
+# Compound the collocations. $ this is a must so the toks gets less tokens.  
+
+toks23 <- tokens_compound(toks23, pattern = toks23$collocation[toks23$z >10])
 #             e) Make tokens.
 
+toks23 <- quanteda::tokens(corp23, 
+                           include_docvars = TRUE,
+                           remove_numbers = TRUE,
+                           remove_punct = TRUE,
+                           remove_symbols = TRUE,
+                           remove_separators = TRUE,
+                           remove_url = TRUE) %>% #Create tokens object
+  tokens_tolower() %>% # Transform to lower case
+  tokens_remove(stopwords("english"))
+
 #             f) Clean tokens.
+toks23 <- prep_toks(toks23)
 
 #             g) Create the dfm.
 
+dfm23 <- dfm(toks23)
+
 #             h) Trim and weight the dfm
-dfm <- dfm_trim(dfm, min_docfreq = 10) # trim DFM
-dfm <- dfm_tfidf(dfm) # weight DFM
+dfm <- dfm_trim(dfm23, min_docfreq = 10) # trim DFM
+dfm <- dfm_tfidf(dfm23) # weight DFM
 
 #             i) Convert dfm to dataframe for ML
 tmpdata <- convert(dfm, to = "data.frame", docvars = NULL)
@@ -104,21 +140,22 @@ cl <- makePSOCKcluster(6) # create number of copies of R to run in parallel and 
 # Note that the number of clusters depends on how many cores your machine has.  
 registerDoParallel(cl) # register parallel backed with foreach package
 
-#             d) Train the model
+#             d) Train the model - Do not save the model on scrip on R markdown - save the model first with the next code. 
+
 nb_train <- train(section_labels ~ ., 
                   data = Train,  
                   method = "naive_bayes", 
-                  metric = "F1",
-                  trControl = train_control,
+                  metric = "F1", 
+                  trControl = train_control, 
                   tuneGrid = tuneGrid,
-                  allowParallel= TRUE
+                  allowParallel= TRUE 
 )
 
 #             e) Save the model!
 saveRDS(nb_train, "data/nb_train")
 
 #             f) If your machine is running slow... read in the model
-#nb_train <- readRDS("data/nb_train")
+nb_train <- readRDS("data/nb_train")
 
 #             g) Stop the cluster
 stopCluster(cl) # stop parallel process once job is done
@@ -150,9 +187,10 @@ head(pred2) # first few predictions
 #             m) Evaluate confusion matrix (because we actually have labels...)
 confusionMatrix(reference = as.factor(vdata$section_labels), data = pred2, mode='everything')
 
+
 ## 4. Training a Support Vector Machine
 # This time, you fill in the blanks based on the procedure we used for 
-# Naive Bayes...
+# Naive Bayes... 
 # You need to a) Examine parameters 
 modelLookup(model = "svmLinear")
 
@@ -164,22 +202,30 @@ cl <- makePSOCKcluster(6) # using 6 clusters.
 registerDoParallel(cl)
 
 #             d) Train the model
-svm_train <- train(
+svm_train <- train(section_labels ~ ., 
+                    data = Train,  
+                    method = "svmLinear", 
+                    metric = "F1", 
+                    trControl = train_control, 
+                    tuneGrid = tuneGrid,
+                    allowParallel= TRUE 
 )
+
 
 #             e) Save the model!
 saveRDS(svm_train, "data/svm_train")
 
 #             f) If your machine is running slow... read in the model
-#svm_train <- readRDS("data/svm_train") 
+svm_train <- readRDS("data/svm_train") 
 
 #             g) Stop the cluster
 stopCluster(cl)
 
 #             h) Evaluate performance
 print(svm_train)
-pred_svm <- predict() # Predict on test sample using best model
+pred_svm <- predict(svm_train, newdata = Test) # Predict on test sample using best model
 confusionMatrix()
+confusionMatrix(reference = as.factor(vdata$section_labels), data = pred2, mode='everything')
 
 #             i) Finalise by training on all labelled data
 svm_final <- train()
